@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
+    <title>VMIX</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap');
+
+        :root {
+            --progress-height: 20vh;
+            --timer-font-size: calc(var(--progress-height) - 2vh);
+            --title-size: 6vh;
+            --progress-bar-color: #22c45d;
+            --progress-bar-bg: #41f280;
+            --title-text-colors: white;
+            --title-background-color: orange;
+        }
+
+        html {
+            background-color: transparent;
+            font-family: 'Roboto';
+            font-weight: 400;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            gap: 1em;
+            justify-content: center;
+            align-items: center;
+            align-content: center;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+        }
+
+
+        /*
+        ** Progress bar
+        */
+
+        .progress {
+            background: var(--progress-bar-color);
+            height: var(--progress-height);
+            transition: all 1s linear;
+        }
+
+        .progress_track {
+            position: relative;
+            width: 100%;
+            height: var(--progress-height);
+            grid-row: 2;
+            grid-column: 2;
+            appearance: none;
+            background-color: var(--progress-bar-bg);
+            transition: all 1s linear;
+        }
+
+        .time {
+            height: 100%;
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            font-weight: 700;
+            font-size: 3em;
+            transition: all 0.5s linear;
+        }
+
+        #info {
+            width: 100%;
+            position: relative;
+        }
+
+        #info h1 {
+            background-color: var(--title-background-color);
+            line-height: var(--title-size);
+            margin: 0;
+            padding: 0.2em 2rem;
+            font-size: var(--title-size);
+            color: var(--title-text-color);
+            text-transform: uppercase;
+            text-overflow: ellipsis;
+            width: 100%;
+            overflow: hidden;
+            white-space: nowrap;
+            box-sizing: border-box;
+        }
+
+        #position,
+        #remaining {
+            font-weight: 600;
+        }
+
+        div#position {
+            position: absolute;
+            top: 0;
+            left: 2rem;
+            font-size: var(--timer-font-size);
+            color: white;
+        }
+
+        div#remaining {
+            position: absolute;
+            top: 0;
+            right: 2rem;
+            font-size: var(--timer-font-size);
+            color: white;
+        }
+
+        #info {
+            transition: 0.5s linear all;
+        }
+
+        #info.flash .progress {
+            animation: blink 1s both infinite;
+        }
+
+        #info.hide {
+            opacity: 0;
+        }
+
+        @keyframes blink {
+            0% {
+                background-color: red;
+            }
+
+            50% {
+                background-color: #22c45d;
+            }
+
+            100% {
+                background-color: red;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id='info'>
+        <h1></h1>
+        <div class="progress_track" max='${video.duration}' value='${video.position}'>
+            <div class="progress"></div>
+            <div id="position">00:00</div>
+            <div id="remaining">00:00</div>
+        </div>
+        <div>
+            <script>
+
+                let params = new URLSearchParams(document.location.search);
+                let server = params.get('server') || 'http://localhost:8088/api/';
+                let filter = params.get('filter') || 'live';
+                let updateInterval = params.get('update') || 1000;
+                let secondsRemainingWarning = 5;
+
+
+                function secondsToTime(seconds) {
+                    let result = 0;
+                    if (seconds > 3600) {
+                        result = new Date(seconds * 1000).toISOString().slice(11, 19);
+                    } else {
+                        result = new Date(seconds * 1000).toISOString().slice(14, 19);
+                    }
+                    return result;
+                }
+
+
+                function fetchVideoTimes() {
+
+                    return new Promise(resolve => {
+                        var info = fetch(server, { method: "Get" });
+                        var video = {}
+
+                        info.then(response => response.text())
+                            .then(str => new window.DOMParser().parseFromString(str, "text/xml"))
+                            .then(data => {
+                                var preview = parseInt(data.querySelector('vmix').querySelector('preview').innerHTML)
+                                var program = parseInt(data.querySelector('vmix').querySelector('active').innerHTML)
+
+                                var input = data.querySelector('vmix').querySelector('inputs').querySelector(`input[type="Video"][number="${program}"`)
+                                var number = parseInt(input.getAttribute('number'))
+                                var title = input.getAttribute('title')
+                                var position = (parseFloat(input.getAttribute('position')) / 1000).toFixed(0)
+                                var duration = (parseFloat(input.getAttribute('duration')) / 1000).toFixed(0)
+                                var remaining = (duration - position).toFixed(0)
+
+
+                                if (number != program) {
+                                    video = null
+                                } else {
+                                    video = {
+                                        'number': number,
+                                        'title': title,
+                                        'position': position,
+                                        'duration': duration,
+                                        'active': program == number,
+                                        'remaining': remaining
+                                    }
+                                }
+                            })
+                            .catch((error) => {
+                                console.log(error)
+                            })
+                            .finally(() => {
+                                resolve(video);
+                            })
+                    })
+                }
+
+                function updateData() {
+
+                    var video = fetchVideoTimes();
+
+                    video.then((info) => {
+                        if (Object.keys(info).length === 0) {
+
+                            var infoElement = document.getElementById('info');
+
+                            // Hide element
+                            infoElement.classList.add("hide")
+
+                            // Set values to empty
+                            infoElement.querySelector('h1').innerText = "STANDBY"
+                            infoElement.querySelector('#remaining').innerText = "00:00"
+                            infoElement.querySelector('#position').innerText = "00:00"
+                            infoElement.querySelector('.progress').style.width = "00:00"
+
+                            // Flash time bar when less than 5 seconds remain
+                            if (parseInt(info.remaining) < 5) {
+                                infoElement.classList.add('flash')
+                            } else {
+                                infoElement.classList.remove('flash')
+                            }
+                        } else {
+                            var progress_width = (parseFloat(info.position) * 100 / parseFloat(info.duration)).toFixed(0) + "%";
+                            var remaining = (info.duration - info.position).toFixed(0);
+
+                            var infoElement = document.getElementById('info');
+
+                            infoElement.querySelector('h1').innerText = info.title
+                            infoElement.querySelector('#remaining').innerText = secondsToTime(info.remaining)
+                            infoElement.querySelector('#position').innerText = secondsToTime(info.position)
+                            infoElement.querySelector('.progress').style.width = progress_width
+
+                            // Flash time when less than secondsRemainingWarning are left
+                            if (parseInt(info.remaining) < secondsRemainingWarning) {
+                                infoElement.classList.add('flash')
+                            } else {
+                                infoElement.classList.remove('flash')
+                            }
+
+                            // Show info
+                            infoElement.classList.remove("hide")
+
+                        }
+                    })
+                }
+
+                // Initial data update
+                updateData()
+
+                // Update data every updateInterval ms
+                setInterval(() => {
+                    updateData()
+                }, updateInterval)
+            </script>
+</body>
+</html>
