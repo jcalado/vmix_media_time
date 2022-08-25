@@ -152,9 +152,9 @@
 
                 let params = new URLSearchParams(document.location.search);
                 let server = params.get('server') || 'http://localhost:8088/api/';
-                let filter = params.get('filter') || 'live';
                 let updateInterval = params.get('update') || 1000;
                 let secondsRemainingWarning = 5;
+                let showMinusIndicator  = true;
 
 
                 function secondsToTime(seconds) {
@@ -241,7 +241,7 @@
                             var infoElement = document.getElementById('info');
 
                             infoElement.querySelector('h1').innerText = info.title
-                            infoElement.querySelector('#remaining').innerText = secondsToTime(info.remaining)
+                            infoElement.querySelector('#remaining').innerText = (showMinusIndicator ? "-" : "") + secondsToTime(info.remaining)
                             infoElement.querySelector('#position').innerText = secondsToTime(info.position)
                             infoElement.querySelector('.progress').style.width = progress_width
 
