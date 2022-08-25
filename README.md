@@ -1,4 +1,10 @@
 # vmix_media_time
+Shows a bar with title, elapsed and remaining time for the media playing on a vmix instance.
+When less than 5 seconds remain, timer flashes red.
+
+## Screenshot
+![image](https://user-images.githubusercontent.com/26873/186619058-7d1698cd-f244-4936-b2e2-41ab38adc27e.png)
+
 
 ## Options
 URL params:
@@ -29,7 +35,5 @@ Lines 14-20 are CSS variables that can be changed:
 --title-background-color: orange;
 ```
 
-## Screenshot
-![image](https://user-images.githubusercontent.com/26873/186619058-7d1698cd-f244-4936-b2e2-41ab38adc27e.png)
 
 
