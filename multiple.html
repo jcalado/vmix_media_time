@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
+    <title>VMIX</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap');
+
+        html {
+            background-color: rgb(27, 27, 27);
+            font-family: 'Roboto Mono';
+            font-weight: 400;
+        }
+
+        body {
+            padding-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 1em;
+            justify-content: center;
+            align-items: center;
+            align-content: center;
+        }
+
+        .video {
+            background-color: rgb(0, 0, 0);
+            padding: 3em 2em;
+            border-radius: 0.5em;
+            color: white;
+            width: 90%;
+            display: grid;
+            grid-template-columns: 1fr 5fr;
+        }
+
+        span.input {
+            background-color: rgb(211, 211, 211);
+            color: black;
+            padding: 5px 10px;
+            font-size: 1rem;
+            border-radius: 0.5em;
+            font-weight: 700;
+            margin-right: 2em;
+            grid-row: 1;
+            grid-column: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-transform: uppercase;
+            text-shadow: 0px 2px 2px rgb(109, 109, 109);
+        }
+
+        .input.active {
+            background-color: green;
+            color: white;
+        }
+
+        .progress_track {
+            width: 100%;
+            height: 5em;
+            grid-row: 2;
+            grid-column: 2;
+            appearance: none;
+            background-color: green;
+        }
+
+        h1,
+        h2 {
+            font-size: 1.2rem;
+            font-weight: 400;
+        }
+
+        h1 {
+            grid-column: 2;
+            grid-row: 1;
+        }
+
+        .duration {
+            grid-column: 2;
+            grid-row: 3;
+        }
+
+        .position {
+            grid-column: 2;
+            grid-row: 4;
+        }
+
+        .remaining {
+            grid-column: 2;
+            grid-row: 5;
+        }
+
+
+        #offline {
+            color: green;
+            font-size: 10vw;
+            width: 100%;
+            display: block;
+            text-align: center;
+            margin-top: 20vh;
+        }
+
+        .progress_track {
+            position: relative;
+        }
+
+        .progress {
+            background: rgb(0, 201, 0);
+            height: 5em;
+            box-shadow: 0px 10px 30px -10px rgb(0, 201, 0);
+        }
+
+        .time {
+            height: 100%;
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            font-weight: 700;
+            font-size: 3em;
+        }
+
+    </style>
+</head>
+
+<body>
+    <div id="offline">OFFLINE</div>
+    <script>
+
+        let params = new URLSearchParams(document.location.search);
+        let server = params.get('server') || 'http://localhost:8088/api/';
+        let filter = params.get('filter') || 'live' ;
+        let updateInterval = params.get('update') || 1000 ;
+
+
+        function fetchVideoTimes() {
+
+
+            return new Promise(resolve => {
+                var info = fetch(server, { method: "Get" });
+
+                var videos = [];
+
+                info.then(response => response.text())
+                    .then(str => new window.DOMParser().parseFromString(str, "text/xml"))
+                    .then(data => {
+                        data.querySelector('vmix').querySelector('inputs').querySelectorAll('input[type="Video"]').forEach((input) => {
+
+                            var number = input.getAttribute('number')
+                            var title = input.getAttribute('title')
+                            var position = (parseFloat(input.getAttribute('position')) / 1000).toFixed(1)
+                            var duration = (parseFloat(input.getAttribute('duration')) / 1000).toFixed(1)
+                            var preview = data.querySelector('vmix').querySelector('preview').innerHTML
+                            var program = data.querySelector('vmix').querySelector('active').innerHTML
+
+                            var result = { 'number': number, 'title': title, 'position': position, 'duration': duration, 'active': program == number}
+                            
+                            if (filter != 'all') {
+                                if (number == program) {
+                                    videos.push(result)
+                                }
+                            } else {
+                                videos.push(result)
+                            }
+
+                        })
+                    })
+                    .catch((error) => {
+                        console.log(error)
+                    })
+                    .finally(() => {
+                        resolve(videos);
+                    })
+            })
+        }
+
+        updateData()
+
+        setInterval(() => {
+            updateData()
+        }, updateInterval)
+
+        function updateData() {
+
+            var videos = fetchVideoTimes();
+
+            videos.then((videos) => {
+                document.body.innerHTML = "";
+                videos.forEach((video) => {
+                    var progress_width = (parseFloat(video.position) * 100 / parseFloat(video.duration)).toFixed(0) + "%";
+                    var remaining = (video.duration - video.position).toFixed(0);
+
+                    var html = `<div class='video'>
+                    <span class='input ${video.active ? 'active' : 'preview'}'>Entrada ${video.number}</span>
+                    <h1> ${video.title}</h1>
+                    <div class="progress_track" max='${video.duration}' value='${video.position}'>
+                        <div class="progress" style="width: ${progress_width}"></div>
+                        <div class="time">${remaining < 10 ? "00:0" + remaining : ""}</div>
+                    </div>
+                    <h2 class="duration">Duração: ${video.duration}s</h2>
+                    <h2 class="position">Posição: ${video.position}s</h2>
+                    <h2 class="remaining">Faltam: ${(video.duration - video.position).toFixed(0)}s</h2>
+                    <div>`;
+                    document.body.insertAdjacentHTML('beforeend', html)
+                })
+            })
+
+            return videos;
+        }
+
+
+
+    </script>
+</body>
+
+</html>
